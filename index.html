@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nathan's Jam · Stable Baseline</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0c;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .app {
+      display: flex;
+      max-width: 1100px;
+      width: 100%;
+      height: 95vh;
+      gap: 12px;
+    }
+    .sidebar {
+      width: 260px;
+      background: #1a1a2e;
+      border-radius: 20px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid #3a3a5e;
+      transition: width 0.2s;
+    }
+    .sidebar.collapsed {
+      width: 50px;
+    }
+    .sidebar.collapsed .sidebar-header span,
+    .sidebar.collapsed .sidebar-actions,
+    .sidebar.collapsed .thread-list,
+    .sidebar.collapsed .new-thread-btn {
+      display: none;
+    }
+    .sidebar.collapsed .sidebar-header {
+      justify-content: center;
+    }
+    .sidebar-header {
+      padding: 16px;
+      border-bottom: 1px solid #3a3a5e;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .sidebar-header span {
+      color: #ccc;
+      font-size: 14px;
+    }
+    .toggle-btn {
+      background: none;
+      border: none;
+      color: #aaa;
+      cursor: pointer;
+      font-size: 18px;
+      padding: 4px;
+    }
+    .sidebar-actions {
+      padding: 8px;
+      display: flex;
+      gap: 8px;
+    }
+    .import-btn, .export-btn {
+      flex: 1;
+      padding: 8px;
+      background: #2a2a4e;
+      border: 1px solid #3a3a5e;
+      border-radius: 8px;
+      color: #ccc;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .export-btn {
+      background: #fbbc04;
+      color: #000;
+      border-color: #fbbc04;
+    }
+    .thread-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    .thread-item {
+      padding: 10px 12px;
+      border-radius: 10px;
+      margin-bottom: 4px;
+      cursor: pointer;
+      background: #2a2a4e;
+      border: 1px solid #3a3a5e;
+      color: white;
+    }
+    .thread-item.active {
+      background: #34a853;
+    }
+    .new-thread-btn {
+      margin: 8px;
+      padding: 10px;
+      background: #34a853;
+      border: none;
+      border-radius: 10px;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .main {
+      flex: 1;
+      background: #1a1a2e;
+      border-radius: 24px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid #3a3a5e;
+    }
+    .header {
+      padding: 20px;
+      border-bottom: 1px solid #3a3a5e;
+      background: #1e1e3a;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    h1 {
+      font-size: 24px;
+      background: linear-gradient(135deg, #34a853, #8ab4f8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .chat-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .message {
+      display: flex;
+      gap: 12px;
+      max-width: 85%;
+    }
+    .message.user {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #2a2a4e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+    .message.user .avatar { background: #34a853; }
+    .bubble {
+      background: #2a2a4e;
+      padding: 12px 16px;
+      border-radius: 18px;
+      color: #eee;
+      line-height: 1.5;
+    }
+    .message.user .bubble { background: #34a853; color: white; }
+    .file-attachment {
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 8px;
+      font-size: 12px;
+    }
+    .input-area {
+      padding: 20px;
+      border-top: 1px solid #3a3a5e;
+      background: #1e1e3a;
+    }
+    .file-preview {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .file-tag {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: #2a2a4e;
+      border-radius: 20px;
+      font-size: 12px;
+      color: #ccc;
+    }
+    .file-tag button {
+      background: none;
+      border: none;
+      color: #ff8a80;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0 4px;
+    }
+    .input-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+    }
+    .input-wrapper {
+      flex: 1;
+      position: relative;
+    }
+    textarea {
+      width: 100%;
+      padding: 14px 50px 14px 18px;
+      background: #0f0f1a;
+      border: 1px solid #3a3a5e;
+      border-radius: 24px;
+      color: white;
+      font-size: 15px;
+      resize: none;
+      min-height: 55px;
+      max-height: 150px;
+      font-family: inherit;
+    }
+    textarea:focus { outline: none; border-color: #34a853; }
+    .attach-btn {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #aaa;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 6px;
+    }
+    .attach-btn:hover { color: #34a853; }
+    button {
+      padding: 14px 28px;
+      background: #34a853;
+      border: none;
+      border-radius: 24px;
+      color: white;
+      font-weight: 600;
+      font-size: 15px;
+      cursor: pointer;
+      height: 55px;
+    }
+    button:disabled { opacity: 0.5; }
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-left: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .empty-state {
+      text-align: center;
+      color: #666;
+      padding: 40px;
+    }
+    #fileInput, #importInput { display: none; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span>📁 Threads</span>
+      <button class="toggle-btn" id="toggleSidebar">◀</button>
+    </div>
+    <div class="sidebar-actions">
+      <button class="import-btn" id="importBtn">📥 Import</button>
+      <button class="export-btn" id="exportBtn">📤 Export</button>
+    </div>
+    <div class="thread-list" id="threadList"></div>
+    <button class="new-thread-btn" id="newThreadBtn">✨ New Thread</button>
+  </div>
+
+  <div class="main">
+    <div class="header">
+      <h1>🍌 Nathan's Jam</h1>
+    </div>
+    <div class="chat-area" id="chatArea">
+      <div class="empty-state">Select or create a thread</div>
+    </div>
+    <div class="input-area">
+      <div class="file-preview" id="filePreview"></div>
+      <div class="input-row">
+        <div class="input-wrapper">
+          <textarea id="messageInput" placeholder="Type a message or attach files..." rows="1"></textarea>
+          <button class="attach-btn" id="attachBtn">📎</button>
+        </div>
+        <button id="sendBtn">Send</button>
+      </div>
+    </div>
+    <input type="file" id="fileInput" accept="image/*,audio/*,.pdf,.txt,.md,text/plain,application/pdf" multiple>
+    <input type="file" id="importInput" accept=".md,text/markdown,text/plain">
+  </div>
+</div>
+
+<script>
+  const API_KEY = 'AIzaSyBRNn63JuMDMVgnyoYTNheBTB6g9yZ0VyU';
+  const MODEL = 'gemini-2.5-flash-lite';
+  const STORAGE_KEY = 'nathans-jam-stable-baseline';
+
+  let threads = [];
+  let activeThreadId = null;
+  let pendingFiles = [];
+  let isLoading = false;
+  
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let isRecording = false;
+
+  const sidebar = document.getElementById('sidebar');
+  const toggleSidebar = document.getElementById('toggleSidebar');
+  const threadList = document.getElementById('threadList');
+  const newThreadBtn = document.getElementById('newThreadBtn');
+  const importBtn = document.getElementById('importBtn');
+  const exportBtn = document.getElementById('exportBtn');
+  const importInput = document.getElementById('importInput');
+  const chatArea = document.getElementById('chatArea');
+  const messageInput = document.getElementById('messageInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const attachBtn = document.getElementById('attachBtn');
+  const fileInput = document.getElementById('fileInput');
+  const filePreview = document.getElementById('filePreview');
+
+  // ========== THREAD MANAGEMENT ==========
+  function loadThreads() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      threads = JSON.parse(saved);
+    } else {
+      threads = [{
+        id: 'default-' + Date.now(),
+        title: 'General Chat',
+        messages: [],
+        updatedAt: Date.now()
+      }];
+    }
+    saveThreads();
+  }
+
+  function saveThreads() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(threads));
+  }
+
+  function createThread(title = 'New Chat', messages = []) {
+    const thread = {
+      id: Date.now() + '-' + Math.random().toString(36),
+      title,
+      messages,
+      updatedAt: Date.now()
+    };
+    threads.push(thread);
+    saveThreads();
+    return thread;
+  }
+
+  function renderSidebar() {
+    threadList.innerHTML = '';
+    threads.sort((a, b) => b.updatedAt - a.updatedAt).forEach(thread => {
+      const div = document.createElement('div');
+      div.className = 'thread-item' + (thread.id === activeThreadId ? ' active' : '');
+      div.textContent = thread.title;
+      div.onclick = () => switchThread(thread.id);
+      threadList.appendChild(div);
+    });
+  }
+
+  function switchThread(threadId) {
+    activeThreadId = threadId;
+    renderSidebar();
+    renderActiveThread();
+    pendingFiles = [];
+    updateFilePreview();
+  }
+
+  function getActiveThread() {
+    return threads.find(t => t.id === activeThreadId);
+  }
+
+  function renderActiveThread() {
+    const thread = getActiveThread();
+    if (!thread) {
+      chatArea.innerHTML = '<div class="empty-state">Select or create a thread</div>';
+      return;
+    }
+    chatArea.innerHTML = '';
+    if (thread.messages.length === 0) {
+      chatArea.innerHTML = '<div class="empty-state">Send a message to start</div>';
+      return;
+    }
+    thread.messages.forEach(msg => {
+      const role = msg.role === 'user' ? 'user' : 'assistant';
+      const text = msg.parts.find(p => p.text)?.text || '';
+      const files = msg.parts.filter(p => p.inlineData).map(p => ({ name: 'File', type: p.inlineData.mimeType }));
+      renderMessage(role, text, files);
+    });
+  }
+
+  function renderMessage(role, text, files = []) {
+    const div = document.createElement('div');
+    div.className = `message ${role}`;
+    const bubbleContent = text ? text.replace(/\n/g, '<br>') : (files.length ? '(attached files)' : '');
+    let bubbleHtml = `<div class="bubble">${bubbleContent}`;
+    files.forEach(f => {
+      bubbleHtml += `<div class="file-attachment">📎 ${f.name || 'File'} (${f.type || 'unknown'})</div>`;
+    });
+    bubbleHtml += '</div>';
+    div.innerHTML = `<div class="avatar">${role === 'user' ? '👤' : '🍌'}</div>${bubbleHtml}`;
+    chatArea.appendChild(div);
+    chatArea.scrollTop = chatArea.scrollHeight;
+  }
+
+  // ========== MARKDOWN IMPORT/EXPORT ==========
+  function parseMarkdownToMessages(mdText) {
+    const messages = [];
+    const lines = mdText.split('\n');
+    let currentRole = null, currentContent = [];
+    for (const line of lines) {
+      if (line.match(/^\*\*👤 You\*\*/) || line.match(/^You:/i)) {
+        if (currentRole) messages.push({ role: currentRole, parts: [{ text: currentContent.join('\n').trim() }] });
+        currentRole = 'user';
+        const content = line.replace(/^\*\*👤 You\*\*:?\s*/, '').replace(/^You:\s*/i, '');
+        currentContent = content ? [content] : [];
+      } else if (line.match(/^\*\*🍌.*\*\*/) || line.match(/^Assistant:/i) || line.match(/^🍌/)) {
+        if (currentRole) messages.push({ role: currentRole, parts: [{ text: currentContent.join('\n').trim() }] });
+        currentRole = 'assistant';
+        const content = line.replace(/^\*\*🍌[^*]*\*\*:?\s*/, '').replace(/^Assistant:\s*/i, '').replace(/^🍌:?\s*/, '');
+        currentContent = content ? [content] : [];
+      } else if (currentRole !== null && line.trim() && !line.match(/^---/) && !line.match(/^#/)) {
+        currentContent.push(line);
+      }
+    }
+    if (currentRole && currentContent.length) messages.push({ role: currentRole, parts: [{ text: currentContent.join('\n').trim() }] });
+    return messages;
+  }
+
+  async function importMarkdown(file) {
+    const text = await file.text();
+    const messages = parseMarkdownToMessages(text);
+    if (messages.length === 0) { alert('No valid messages found.'); return; }
+    const thread = createThread(file.name.replace(/\.md$/, ''), messages);
+    activeThreadId = thread.id;
+    renderSidebar();
+    renderActiveThread();
+  }
+
+  function exportActiveThread() {
+    const thread = getActiveThread();
+    if (!thread || thread.messages.length === 0) { alert('No messages to export.'); return; }
+    let md = `# ${thread.title}\n\n**Exported:** ${new Date().toLocaleString()}\n**Model:** ${MODEL}\n\n---\n\n`;
+    thread.messages.forEach((msg, i) => {
+      const role = msg.role === 'user' ? '**👤 You**' : '**🍌 Nathan\'s Jam**';
+      md += `${role}\n\n`;
+      const text = msg.parts.find(p => p.text)?.text || '';
+      if (text) md += text + '\n\n';
+      if (i < thread.messages.length - 1) md += '---\n\n';
+    });
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${thread.title.replace(/[^a-z0-9]/gi, '_')}.md`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  // ========== FILE HANDLING ==========
+  function updateFilePreview() {
+    filePreview.innerHTML = '';
+    pendingFiles.forEach((f, i) => {
+      const tag = document.createElement('div');
+      tag.className = 'file-tag';
+      const isAudio = f.name.includes('recording') || f.type.startsWith('audio/');
+      tag.innerHTML = `${isAudio ? '🎤' : '📎'} ${f.name} (${(f.size / 1024).toFixed(1)} KB) <button data-index="${i}">×</button>`;
+      tag.querySelector('button').addEventListener('click', () => {
+        pendingFiles.splice(i, 1);
+        updateFilePreview();
+      });
+      filePreview.appendChild(tag);
+    });
+  }
+
+  async function processFiles(files) {
+    const processed = [];
+    for (const f of files) {
+      let b64 = f.data;
+      if (!b64) {
+        b64 = await new Promise(r => {
+          const reader = new FileReader();
+          reader.onload = e => r(e.target.result.split(',')[1]);
+          reader.readAsDataURL(f.file);
+        });
+      }
+      processed.push({ name: f.name, type: f.type, data: b64, size: f.size });
+    }
+    return processed;
+  }
+
+  // ========== VOICE RECORDING (WITH ON-SCREEN STATUS) ==========
+  const micBtn = document.createElement('button');
+  const recordingStatus = document.createElement('div');
+  
+  function updateStatus(text, isError = false) {
+    recordingStatus.style.display = 'block';
+    recordingStatus.style.color = isError ? '#ff4444' : '#aaa';
+    recordingStatus.textContent = text;
+    console.log(text);
+  }
+
+  async function toggleRecording() {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      await startRecording();
+    }
+  }
+
+  async function startRecording() {
+    try {
+      updateStatus('🎤 Requesting microphone permission...');
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      updateStatus('✅ Microphone access granted');
+      
+      mediaRecorder = new MediaRecorder(stream);
+      audioChunks = [];
+      
+      mediaRecorder.ondataavailable = (e) => {
+        updateStatus(`🎤 Recording... (${(e.data.size / 1024).toFixed(1)} KB)`);
+        audioChunks.push(e.data);
+      };
+      
+      mediaRecorder.onstop = async () => {
+        updateStatus('🎤 Processing recording...');
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        
+        const base64 = await blobToBase64(audioBlob);
+        updateStatus(`✅ Recording complete (${(audioBlob.size / 1024).toFixed(1)} KB)`);
+        
+        pendingFiles.push({
+          file: audioBlob,
+          name: `recording-${Date.now()}.webm`,
+          type: 'audio/webm',
+          size: audioBlob.size,
+          data: base64
+        });
+        
+        updateFilePreview();
+        updateStatus('📎 Audio file attached. Ready to send.');
+        
+        micBtn.classList.remove('recording');
+        micBtn.textContent = '🎤';
+        
+        stream.getTracks().forEach(track => track.stop());
+      };
+      
+      mediaRecorder.start(1000); // Get data every second for smoother updates
+      isRecording = true;
+      
+      micBtn.classList.add('recording');
+      micBtn.textContent = '⏹️';
+      updateStatus('🔴 Recording... Tap ⏹️ to stop');
+      
+    } catch (err) {
+      updateStatus('❌ Microphone access denied. Please allow microphone permissions.', true);
+      alert('Microphone access denied. On Android, please ensure:\n\n1. Chrome has microphone permission (Settings > Apps > Chrome > Permissions)\n2. The page is served over HTTPS or localhost');
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop();
+      isRecording = false;
+      updateStatus('Recording stopped.');
+    }
+  }
+
+  function blobToBase64(blob) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target.result.split(',')[1];
+        resolve(base64);
+      };
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  // ========== CHAT ==========
+  function clearEmptyState() {
+    const empty = chatArea.querySelector('.empty-state');
+    if (empty) empty.remove();
+  }
+
+  function addLoading() {
+    const div = document.createElement('div');
+    div.className = 'message assistant';
+    div.id = 'loadingIndicator';
+    div.innerHTML = `<div class="avatar">🍌</div><div class="bubble">Thinking<span class="loading"></span></div>`;
+    chatArea.appendChild(div);
+    chatArea.scrollTop = chatArea.scrollHeight;
+  }
+
+  function removeLoading() {
+    document.getElementById('loadingIndicator')?.remove();
+  }
+
+  async function sendMessage() {
+    const text = messageInput.value.trim();
+    const hasFiles = pendingFiles.length > 0;
+    if (!text && !hasFiles) return;
+    if (isLoading) return;
+    let thread = getActiveThread();
+    if (!thread) {
+      thread = createThread();
+      activeThreadId = thread.id;
+      renderSidebar();
+    }
+    clearEmptyState();
+    const parts = [];
+    if (text) parts.push({ text });
+    let displayFiles = [];
+    if (hasFiles) {
+      const processed = await processFiles(pendingFiles);
+      processed.forEach(f => {
+        parts.push({ inlineData: { mimeType: f.type, data: f.data } });
+        displayFiles.push({ name: f.name, type: f.type });
+      });
+    }
+    renderMessage('user', text || '', displayFiles);
+    thread.messages.push({ role: 'user', parts });
+    thread.updatedAt = Date.now();
+    if (thread.title === 'New Chat') thread.title = text.slice(0, 30) || (hasFiles ? 'Voice note' : 'File upload');
+    saveThreads();
+    messageInput.value = '';
+    messageInput.style.height = 'auto';
+    pendingFiles = [];
+    updateFilePreview();
+    updateStatus(''); // Clear recording status
+    isLoading = true;
+    sendBtn.disabled = true;
+    addLoading();
+    try {
+      const payload = { contents: thread.messages, generationConfig: { temperature: 1.0, maxOutputTokens: 4096 } };
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      removeLoading();
+      if (!res.ok) throw new Error(`API ${res.status}`);
+      const data = await res.json();
+      const candidate = data.candidates?.[0];
+      if (!candidate?.content?.parts) throw new Error('No response');
+      let replyText = '';
+      const replyParts = [];
+      for (const part of candidate.content.parts) {
+        if (part.text) { replyText += part.text; replyParts.push({ text: part.text }); }
+        else if (part.inlineData) replyParts.push({ inlineData: part.inlineData });
+      }
+      if (!replyText && replyParts.length === 0) replyText = '(No response)';
+      renderMessage('assistant', replyText);
+      thread.messages.push({ role: 'model', parts: replyParts });
+      thread.updatedAt = Date.now();
+      saveThreads();
+      renderSidebar();
+    } catch (err) {
+      removeLoading();
+      renderMessage('assistant', `Error: ${err.message}`);
+    } finally {
+      isLoading = false;
+      sendBtn.disabled = false;
+    }
+  }
+
+  // ========== SETUP UI ==========
+  const inputWrapper = document.querySelector('.input-wrapper');
+  const textarea = document.getElementById('messageInput');
+  
+  // Configure mic button
+  micBtn.id = 'micBtn';
+  micBtn.className = 'icon-btn';
+  micBtn.innerHTML = '🎤';
+  micBtn.title = 'Record voice';
+  micBtn.style.cssText = 'position:absolute; right:60px; top:50%; transform:translateY(-50%); background:none; border:none; color:#aaa; font-size:20px; cursor:pointer; padding:6px;';
+  
+  // Configure recording status
+  recordingStatus.id = 'recordingStatus';
+  recordingStatus.style.cssText = 'font-size:12px; margin-top:8px; display:none;';
+  
+  // Adjust textarea
+  textarea.style.paddingRight = '110px';
+  
+  // Insert elements
+  inputWrapper.insertBefore(micBtn, attachBtn);
+  document.querySelector('.input-area').appendChild(recordingStatus);
+  
+  // Add CSS for recording state
+  const style = document.createElement('style');
+  style.textContent = `
+    .icon-btn.recording { color: #ff4444 !important; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  `;
+  document.head.appendChild(style);
+  
+  micBtn.addEventListener('click', toggleRecording);
+
+  // ========== EVENT LISTENERS ==========
+  toggleSidebar.addEventListener('click', () => {
+    sidebar.classList.toggle('collapsed');
+    toggleSidebar.textContent = sidebar.classList.contains('collapsed') ? '▶' : '◀';
+  });
+  newThreadBtn.addEventListener('click', () => {
+    const thread = createThread();
+    activeThreadId = thread.id;
+    renderSidebar();
+    renderActiveThread();
+  });
+  importBtn.addEventListener('click', () => importInput.click());
+  exportBtn.addEventListener('click', exportActiveThread);
+  importInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) { importMarkdown(file); importInput.value = ''; }
+  });
+  sendBtn.addEventListener('click', sendMessage);
+  attachBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    Array.from(fileInput.files).forEach(f => pendingFiles.push({ file: f, name: f.name, type: f.type, size: f.size }));
+    updateFilePreview();
+    fileInput.value = '';
+  });
+  messageInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+  messageInput.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 150) + 'px';
+  });
+  chatArea.addEventListener('dragover', e => e.preventDefault());
+  chatArea.addEventListener('drop', e => {
+    e.preventDefault();
+    Array.from(e.dataTransfer.files).forEach(f => pendingFiles.push({ file: f, name: f.name, type: f.type, size: f.size }));
+    updateFilePreview();
+  });
+
+  // INIT
+  loadThreads();
+  if (threads.length > 0) activeThreadId = threads[0].id;
+  renderSidebar();
+  renderActiveThread();
+</script>
+</body>
+</html>
